@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: youtube-loader-demo
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: YOUTUBE_LOADER_DOWNLOAD_DIR
+        value: /app/downloads
