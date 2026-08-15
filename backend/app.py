@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import os
 import re
@@ -26,7 +27,57 @@ DB_PATH = DATA_DIR / "youtube-loader.sqlite3"
 DOWNLOAD_DIR = Path(os.getenv("YOUTUBE_LOADER_DOWNLOAD_DIR", BASE_DIR / "downloads")).resolve()
 DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-app = FastAPI(title="YouTube Loader", version="0.6.0")
+COOKIE_FILE = DATA_DIR / "youtube-cookies.txt"
+
+
+def prepare_cookie_file() -> Path | None:
+    """Materialize an optional Netscape cookies.txt from secrets without logging contents."""
+    encoded = os.getenv("YOUTUBE_COOKIES_BASE64", "").strip()
+    plain = os.getenv("YOUTUBE_COOKIES_TEXT", "")
+    external_path = os.getenv("YOUTUBE_COOKIES_FILE", "").strip()
+
+    try:
+        if encoded:
+            content = base64.b64decode(encoded, validate=True)
+            COOKIE_FILE.write_bytes(content)
+            os.chmod(COOKIE_FILE, 0o600)
+            return COOKIE_FILE
+        if plain.strip():
+            COOKIE_FILE.write_text(plain, encoding="utf-8")
+            os.chmod(COOKIE_FILE, 0o600)
+            return COOKIE_FILE
+        if external_path:
+            path = Path(external_path).expanduser().resolve()
+            if path.is_file():
+                return path
+    except Exception:
+        return None
+    return None
+
+
+def cookie_status() -> dict[str, Any]:
+    path = prepare_cookie_file()
+    return {
+        "ok": bool(path and path.is_file() and path.stat().st_size > 0),
+        "configured": bool(path),
+        "source": (
+            "base64-secret" if os.getenv("YOUTUBE_COOKIES_BASE64", "").strip()
+            else "text-secret" if os.getenv("YOUTUBE_COOKIES_TEXT", "").strip()
+            else "file" if os.getenv("YOUTUBE_COOKIES_FILE", "").strip()
+            else "none"
+        ),
+    }
+
+
+def youtube_opts(options: dict[str, Any] | None = None) -> dict[str, Any]:
+    opts = dict(options or {})
+    cookie_file = prepare_cookie_file()
+    if cookie_file:
+        opts["cookiefile"] = str(cookie_file)
+    return opts
+
+
+app = FastAPI(title="YouTube Loader", version="0.6.1")
 
 jobs: dict[str, dict[str, Any]] = {}
 jobs_lock = threading.Lock()
@@ -129,6 +180,7 @@ def runtime_snapshot() -> dict[str, Any]:
                 "ok": writable_check(DATA_DIR),
                 "path": str(DATA_DIR),
             },
+            "youtube_auth": cookie_status(),
         },
         "storage": {
             "total": usage.total,
@@ -362,17 +414,29 @@ def runtime_self_test() -> dict[str, Any]:
 
 @app.post("/api/youtube/info")
 def youtube_info(payload: InfoRequest) -> dict[str, Any]:
-    opts = {
+    opts = youtube_opts({
         "quiet": True,
         "skip_download": True,
         "extract_flat": "in_playlist",
         "playlistend": 100,
-    }
+    })
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             raw = ydl.extract_info(payload.url, download=False)
         return public_info(raw)
     except Exception as exc:
+        text = str(exc)
+        if "Sign in to confirm you’re not a bot" in text or "Sign in to confirm you're not a bot" in text:
+            auth = cookie_status()
+            if not auth.get("ok"):
+                raise HTTPException(
+                    status_code=401,
+                    detail="YouTube verlangt für diese Server-IP eine angemeldete Session. Im Runtime-Center fehlt noch YouTube Auth. Hinterlege YOUTUBE_COOKIES_BASE64 als Render-Secret und versuche die Analyse erneut.",
+                ) from exc
+            raise HTTPException(
+                status_code=401,
+                detail="YouTube hat die hinterlegte Session abgelehnt. Das Cookie-Secret muss wahrscheinlich erneuert werden.",
+            ) from exc
         raise HTTPException(status_code=400, detail=f"Analyse fehlgeschlagen: {exc}") from exc
 
 
@@ -487,7 +551,7 @@ def run_download(job_id: str, req: DownloadRequest) -> None:
             ]
             update_job(job_id, playlist_count=len(selected_entries), playlist_items=playlist_items)
 
-        opts: dict[str, Any] = {
+        opts: dict[str, Any] = youtube_opts({
             "format": selector,
             "outtmpl": outtmpl,
             "progress_hooks": [progress_hook],
@@ -500,7 +564,7 @@ def run_download(job_id: str, req: DownloadRequest) -> None:
             "writethumbnail": req.embed_thumbnail,
             "addmetadata": req.write_metadata,
             "ignoreerrors": bool(req.is_playlist),
-        }
+        })
         if req.is_playlist and selected_entries:
             opts["playlist_items"] = ",".join(str(x) for x in selected_entries)
 
@@ -679,7 +743,7 @@ def youtube_suggestions(url: str | None = None, q: str | None = None, limit: int
     query = (q or "").strip()
     try:
         if not query and url:
-            with yt_dlp.YoutubeDL({"quiet": True, "skip_download": True, "noplaylist": True}) as ydl:
+            with yt_dlp.YoutubeDL(youtube_opts({"quiet": True, "skip_download": True, "noplaylist": True})) as ydl:
                 source = ydl.extract_info(url, download=False) or {}
             channel = source.get("channel") or source.get("uploader")
             title = source.get("title")
@@ -687,7 +751,7 @@ def youtube_suggestions(url: str | None = None, q: str | None = None, limit: int
         if not query:
             return {"items": [], "query": ""}
 
-        opts = {"quiet": True, "skip_download": True, "extract_flat": True}
+        opts = youtube_opts({"quiet": True, "skip_download": True, "extract_flat": True})
         with yt_dlp.YoutubeDL(opts) as ydl:
             result = ydl.extract_info(f"ytsearch{limit}:{query}", download=False) or {}
         items = []
