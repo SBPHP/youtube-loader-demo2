@@ -288,12 +288,14 @@ function renderRuntime(data, tested=false){
   setRuntimeCheck('#rtFfmpeg', checks.ffmpeg);
   setRuntimeCheck('#rtDownloads', checks.downloads_writable);
   setRuntimeCheck('#rtDatabase', checks.database_writable);
+  setRuntimeCheck('#rtYoutubeAuth', checks.youtube_auth);
 
   if($('#rtYtdlpVersion')) $('#rtYtdlpVersion').textContent=checks.yt_dlp?.version || '–';
   if($('#rtFfmpegVersion')) $('#rtFfmpegVersion').textContent=checks.ffmpeg?.version || '–';
   if($('#rtDownloadPath')) $('#rtDownloadPath').textContent=checks.downloads_writable?.path || '–';
   if($('#rtDatabasePath')) $('#rtDatabasePath').textContent=checks.database_writable?.path || '–';
-  if($('#rtVersion')) $('#rtVersion').textContent=`v${data?.version || '0.6.0'}`;
+  if($('#rtYoutubeAuthSource')) $('#rtYoutubeAuthSource').textContent=checks.youtube_auth?.ok ? `Secret aktiv · ${checks.youtube_auth?.source || 'configured'}` : 'Kein Cookie-Secret gesetzt';
+  if($('#rtVersion')) $('#rtVersion').textContent=`v${data?.version || '0.6.1'}`;
   if($('#rtFree')) $('#rtFree').textContent=data?.storage?.free_text || '–';
   if($('#rtJobs')) $('#rtJobs').textContent=String(data?.active_jobs ?? 0);
 
@@ -306,7 +308,7 @@ function renderRuntime(data, tested=false){
     const failures=data?.self_test?.failures || [];
     $('#runtimeMessage').textContent=failures.length
       ? `Self-Test abgeschlossen: ${failures.join(', ')} nicht bereit.`
-      : 'Self-Test bestanden: Runtime, FFmpeg, yt-dlp, Downloads und Datenbank sind bereit.';
+      : 'Self-Test bestanden: Runtime, FFmpeg, yt-dlp, Downloads, Datenbank und YouTube-Auth sind bereit.';
     $('#runtimeMessage').className=`runtime-message ${failures.length?'bad':'good'}`;
   }
 }
