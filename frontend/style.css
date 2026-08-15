@@ -31,3 +31,21 @@
 .history-status.finished_with_errors{background:#36270d;color:#fde68a}
 .history-item>div:last-child{display:flex;gap:8px;align-items:center;justify-content:flex-end}
 @media(max-width:720px){.preset-row{align-items:stretch}.preset{flex:1 1 44%}.history-item>div:last-child{justify-content:flex-start}}
+
+/* v0.6.0 — Runtime & Test Center */
+.runtime-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:24px 0}
+.runtime-card{padding:18px;min-width:0}
+.runtime-card small{display:block;color:var(--muted);margin-bottom:8px}
+.runtime-card b{display:block;font-size:18px;margin-bottom:7px}
+.runtime-card span{display:block;color:#8998ae;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.runtime-ok{color:#86efac!important}
+.runtime-bad{color:#fca5a5!important}
+.runtime-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:18px}
+.runtime-summary>div{background:#08111f;border:1px solid var(--line);border-radius:10px;padding:14px}
+.runtime-summary small{display:block;color:var(--muted);font-size:10px;margin-bottom:6px}
+.runtime-summary b{font-size:15px}
+.runtime-message{margin-top:16px;padding:13px 14px;border:1px solid var(--line);background:#08111f;border-radius:9px;color:#b6c2d3}
+.runtime-message.good{border-color:#14532d;background:#0b2116;color:#86efac}
+.runtime-message.bad{border-color:#7f1d1d;background:#271013;color:#fecaca}
+@media(max-width:1000px){.runtime-grid,.runtime-summary{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:640px){.runtime-grid,.runtime-summary{grid-template-columns:1fr}}

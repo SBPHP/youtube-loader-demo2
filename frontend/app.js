@@ -10,6 +10,7 @@ function setView(name){
   document.querySelectorAll('.nav[data-target]').forEach(el=>el.classList.toggle('active', el.dataset.target===name));
   if(name==='history') loadHistory();
   if(name==='suggestions') renderSuggestionTargets();
+  if(name==='runtime') loadRuntime();
 }
 
 async function loadSettings(){
@@ -272,6 +273,76 @@ function applyPreset(name){
   msg(`Preset aktiv: ${p.container.toUpperCase()} · ${p.quality==='best'?'Beste Qualität':p.quality+(p.mode==='video'?'p':' kbps')}`);
 }
 
+
+function setRuntimeCheck(id, info){
+  const el=$(id);
+  if(!el) return;
+  el.textContent=info?.ok ? '✓ Bereit' : '✕ Fehler';
+  el.classList.toggle('runtime-ok', !!info?.ok);
+  el.classList.toggle('runtime-bad', !info?.ok);
+}
+
+function renderRuntime(data, tested=false){
+  const checks=data?.checks || {};
+  setRuntimeCheck('#rtYtdlp', checks.yt_dlp);
+  setRuntimeCheck('#rtFfmpeg', checks.ffmpeg);
+  setRuntimeCheck('#rtDownloads', checks.downloads_writable);
+  setRuntimeCheck('#rtDatabase', checks.database_writable);
+
+  if($('#rtYtdlpVersion')) $('#rtYtdlpVersion').textContent=checks.yt_dlp?.version || '–';
+  if($('#rtFfmpegVersion')) $('#rtFfmpegVersion').textContent=checks.ffmpeg?.version || '–';
+  if($('#rtDownloadPath')) $('#rtDownloadPath').textContent=checks.downloads_writable?.path || '–';
+  if($('#rtDatabasePath')) $('#rtDatabasePath').textContent=checks.database_writable?.path || '–';
+  if($('#rtVersion')) $('#rtVersion').textContent=`v${data?.version || '0.6.0'}`;
+  if($('#rtFree')) $('#rtFree').textContent=data?.storage?.free_text || '–';
+  if($('#rtJobs')) $('#rtJobs').textContent=String(data?.active_jobs ?? 0);
+
+  const allOk=Object.values(checks).every(x=>x?.ok);
+  if($('#rtStatus')){
+    $('#rtStatus').textContent=allOk?'Alles grün':'Prüfung nötig';
+    $('#rtStatus').className=allOk?'runtime-ok':'runtime-bad';
+  }
+  if(tested && $('#runtimeMessage')){
+    const failures=data?.self_test?.failures || [];
+    $('#runtimeMessage').textContent=failures.length
+      ? `Self-Test abgeschlossen: ${failures.join(', ')} nicht bereit.`
+      : 'Self-Test bestanden: Runtime, FFmpeg, yt-dlp, Downloads und Datenbank sind bereit.';
+    $('#runtimeMessage').className=`runtime-message ${failures.length?'bad':'good'}`;
+  }
+}
+
+async function loadRuntime(){
+  try{
+    const r=await fetch('/api/runtime');
+    const data=await r.json();
+    if(!r.ok) throw new Error(data.detail||'Runtime konnte nicht geladen werden');
+    renderRuntime(data,false);
+  }catch(e){
+    if($('#runtimeMessage')) {
+      $('#runtimeMessage').textContent=e.message;
+      $('#runtimeMessage').className='runtime-message bad';
+    }
+  }
+}
+
+async function runRuntimeSelfTest(){
+  const btn=$('#runSelfTest');
+  if(btn){btn.disabled=true;btn.textContent='Prüfe …';}
+  try{
+    const r=await fetch('/api/runtime/self-test',{method:'POST'});
+    const data=await r.json();
+    if(!r.ok) throw new Error(data.detail||'Self-Test fehlgeschlagen');
+    renderRuntime(data,true);
+  }catch(e){
+    if($('#runtimeMessage')){
+      $('#runtimeMessage').textContent=e.message;
+      $('#runtimeMessage').className='runtime-message bad';
+    }
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='▶ Self-Test starten';}
+  }
+}
+
 async function saveSettings(){
   const payload={default_mode:state.mode,default_video_container:state.mode==='video'?$('#container').value:(state.settings?.default_video_container||'mp4'),default_audio_container:state.mode==='audio'?$('#container').value:(state.settings?.default_audio_container||'mp3'),default_video_quality:state.mode==='video'?$('#quality').value:(state.settings?.default_video_quality||'best'),default_audio_bitrate:state.mode==='audio'?Number($('#quality').value):(state.settings?.default_audio_bitrate||320),embed_thumbnail:$('#thumb').checked,write_metadata:$('#metadata').checked};
   try{ const r=await fetch('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); if(r.ok){ state.settings=await r.json(); msg('Einstellungen gespeichert.'); } }catch(_e){}
@@ -291,6 +362,6 @@ $('#playlistInvert')?.addEventListener('click',()=>{ const entries=state.info?.e
 $('#playlistOnlySelected')?.addEventListener('click',()=>{ if(!state.playlistSelection.size) return msg('Wähle mindestens ein Playlist-Video aus.',true); addToQueue(); });
 $('#saveSettingsBtn').addEventListener('click',saveSettings);
 $('#refreshSuggestions')?.addEventListener('click',loadSuggestions); $('#pageRefreshSuggestions')?.addEventListener('click',loadSuggestions); $('#sideRefreshSuggestions')?.addEventListener('click',loadSuggestions);
-$('#historyStatus')?.addEventListener('change',renderHistory); $('#historyType')?.addEventListener('change',renderHistory); document.querySelectorAll('[data-preset]').forEach(btn=>btn.addEventListener('click',()=>applyPreset(btn.dataset.preset)));
+$('#historyStatus')?.addEventListener('change',renderHistory); $('#historyType')?.addEventListener('change',renderHistory); $('#runSelfTest')?.addEventListener('click',runRuntimeSelfTest); document.querySelectorAll('[data-preset]').forEach(btn=>btn.addEventListener('click',()=>applyPreset(btn.dataset.preset)));
 
 fillContainer(); loadSettings(); loadHistory();
