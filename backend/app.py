@@ -5,6 +5,7 @@ import os
 import re
 import shutil
 import sqlite3
+import subprocess
 import threading
 import uuid
 from datetime import datetime, timezone
@@ -25,7 +26,7 @@ DB_PATH = DATA_DIR / "youtube-loader.sqlite3"
 DOWNLOAD_DIR = Path(os.getenv("YOUTUBE_LOADER_DOWNLOAD_DIR", BASE_DIR / "downloads")).resolve()
 DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-app = FastAPI(title="YouTube Loader", version="0.5.0")
+app = FastAPI(title="YouTube Loader", version="0.6.0")
 
 jobs: dict[str, dict[str, Any]] = {}
 jobs_lock = threading.Lock()
@@ -74,6 +75,75 @@ def init_db() -> None:
 
 
 init_db()
+
+
+def writable_check(path: Path) -> bool:
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+        probe = path / ".youtube-loader-write-test"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink(missing_ok=True)
+        return True
+    except Exception:
+        return False
+
+
+def command_version(command: str, args: list[str] | None = None) -> str | None:
+    executable = shutil.which(command)
+    if not executable:
+        return None
+    try:
+        result = subprocess.run(
+            [executable, *(args or ["--version"])],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        text = (result.stdout or result.stderr or "").strip().splitlines()
+        return text[0][:180] if text else "installed"
+    except Exception:
+        return "installed"
+
+
+def runtime_snapshot() -> dict[str, Any]:
+    usage = shutil.disk_usage(DOWNLOAD_DIR)
+    ffmpeg_version = command_version("ffmpeg", ["-version"])
+    return {
+        "ok": True,
+        "version": app.version,
+        "checks": {
+            "yt_dlp": {
+                "ok": True,
+                "version": getattr(yt_dlp.version, "__version__", "unknown"),
+            },
+            "ffmpeg": {
+                "ok": bool(shutil.which("ffmpeg")),
+                "version": ffmpeg_version,
+            },
+            "downloads_writable": {
+                "ok": writable_check(DOWNLOAD_DIR),
+                "path": str(DOWNLOAD_DIR),
+            },
+            "database_writable": {
+                "ok": writable_check(DATA_DIR),
+                "path": str(DATA_DIR),
+            },
+        },
+        "storage": {
+            "total": usage.total,
+            "used": usage.used,
+            "free": usage.free,
+            "total_text": format_bytes(usage.total),
+            "used_text": format_bytes(usage.used),
+            "free_text": format_bytes(usage.free),
+        },
+        "active_jobs": len([
+            job for job in jobs.values()
+            if job.get("status") not in {"finished", "finished_with_errors", "failed", "cancelled"}
+        ]),
+    }
+
 
 
 def safe_filename(name: str) -> str:
@@ -271,6 +341,25 @@ def health() -> dict[str, Any]:
     }
 
 
+
+@app.get("/api/runtime")
+def runtime_status() -> dict[str, Any]:
+    return runtime_snapshot()
+
+
+@app.post("/api/runtime/self-test")
+def runtime_self_test() -> dict[str, Any]:
+    snapshot = runtime_snapshot()
+    checks = snapshot["checks"]
+    failures = [name for name, info in checks.items() if not info.get("ok")]
+    snapshot["self_test"] = {
+        "ok": not failures,
+        "failures": failures,
+        "tested_at": utc_now(),
+    }
+    return snapshot
+
+
 @app.post("/api/youtube/info")
 def youtube_info(payload: InfoRequest) -> dict[str, Any]:
     opts = {
@@ -294,13 +383,13 @@ def make_format_selector(req: DownloadRequest) -> tuple[str, list[dict[str, Any]
         codec = req.container.lower()
         codec_map = {"mp3": "mp3", "m4a": "m4a", "aac": "aac", "opus": "opus", "flac": "flac", "wav": "wav"}
         if codec not in codec_map:
-            raise ValueError(f"Nicht unterstÃ¼tztes Audioformat: {codec}")
+            raise ValueError(f"Nicht unterstütztes Audioformat: {codec}")
         postprocessors.append({"key": "FFmpegExtractAudio", "preferredcodec": codec_map[codec], "preferredquality": str(req.audio_bitrate)})
         return "bestaudio/best", postprocessors
 
     container = req.container.lower()
     if container not in {"mp4", "mkv", "webm"}:
-        raise ValueError(f"Nicht unterstÃ¼tztes Videoformat: {container}")
+        raise ValueError(f"Nicht unterstütztes Videoformat: {container}")
 
     if req.quality == "best":
         selector = "bestvideo*+bestaudio/best"
@@ -308,7 +397,7 @@ def make_format_selector(req: DownloadRequest) -> tuple[str, list[dict[str, Any]
         try:
             height = int(req.quality)
         except ValueError as exc:
-            raise ValueError("UngÃ¼ltige VideoqualitÃ¤t") from exc
+            raise ValueError("Ungültige Videoqualität") from exc
         selector = f"bestvideo*[height<={height}]+bestaudio/best[height<={height}]"
     return selector, postprocessors
 
@@ -612,7 +701,7 @@ def youtube_suggestions(url: str | None = None, q: str | None = None, limit: int
             items.append(item)
         return {"items": items[:limit], "query": query}
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"VorschlÃ¤ge konnten nicht geladen werden: {exc}") from exc
+        raise HTTPException(status_code=400, detail=f"Vorschläge konnten nicht geladen werden: {exc}") from exc
 
 @app.get("/api/youtube/history")
 def youtube_history(limit: int = 40) -> dict[str, Any]:
@@ -657,7 +746,7 @@ def youtube_file(job_id: str) -> FileResponse:
         with db_connect() as conn:
             row = conn.execute("SELECT filename, status FROM jobs WHERE id = ?", (job_id,)).fetchone()
         if not row or row["status"] != "finished" or not row["filename"]:
-            raise HTTPException(status_code=404, detail="Datei nicht verfÃ¼gbar")
+            raise HTTPException(status_code=404, detail="Datei nicht verfügbar")
         filename = row["filename"]
     path = (DOWNLOAD_DIR / filename).resolve()
     if DOWNLOAD_DIR not in path.parents or not path.exists():
