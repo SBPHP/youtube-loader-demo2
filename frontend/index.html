@@ -1,95 +1,53 @@
-YouTube LoaderDownload Videos & Audios
-⇩Downloader  ▣Downloads  ☷Playlists Batch ♡Vorschläge Neu
-◷Verlauf  ⚙Einstellungen  ⓘÜber
-Playlists +
-Playlist-URL einfügenAutomatische Erkennung
-Batch DownloadEine Einstellung für alle Videos
-Playlist analysieren
-Vorschläge für dich
-Nach einer Analyse erscheinen hier passende Videos.
-↻ Vorschläge laden
-⇩
-YouTube Loaderv0.5.0
-● Online
-Downloader
+<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>YouTube Loader</title><link rel="stylesheet" href="/style.css"></head><body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand"><div class="logo">⇩</div><div><b><span>YouTube</span> Loader</b><small>Download Videos & Audios</small></div></div>
+    <nav>
+      <button class="nav active" data-target="downloader"><span>⇩</span>Downloader</button>
+      <button class="nav" data-target="history"><span>▣</span>Downloads</button>
+      <button class="nav" data-target="downloader"><span>☷</span>Playlists <em>Batch</em></button>
+      <button class="nav" data-target="suggestions"><span>♡</span>Vorschläge <em class="new">Neu</em></button><hr>
+      <button class="nav" data-target="history"><span>◷</span>Verlauf</button>
+      <button class="nav" data-target="settings"><span>⚙</span>Einstellungen</button>
+      <button class="nav" data-target="about"><span>ⓘ</span>Über</button>
+    </nav>
+    <section class="side-card"><div class="side-title">Playlists <button>+</button></div><div class="mini-item"><div class="mini-thumb"></div><div><b>Playlist-URL einfügen</b><small>Automatische Erkennung</small></div></div><div class="mini-item"><div class="mini-thumb"></div><div><b>Batch Download</b><small>Eine Einstellung für alle Videos</small></div></div><button class="secondary wide" data-target="downloader">Playlist analysieren</button></section>
+    <section class="side-card"><div class="side-title">Vorschläge für dich</div><div id="sideSuggestions" class="suggestions"><small>Nach einer Analyse erscheinen hier passende Videos.</small></div><button id="sideRefreshSuggestions" class="secondary wide">↻ Vorschläge laden</button></section>
+    <div class="version"><div class="logo small">⇩</div><div><b>YouTube Loader</b><small>v0.5.0</small></div><span>● Online</span></div>
+  </aside>
 
-Lade Videos, Audios und komplette Playlists in deiner gewünschten Qualität.
+  <main class="main">
+    <section data-view="downloader">
+      <header><div><h1>Downloader</h1><p>Lade Videos, Audios und komplette Playlists in deiner gewünschten Qualität.</p></div><div class="header-icons">⚙ ☾ ◉</div></header>
+      <div class="url-row"><div class="url-input">🔗 <input id="url" placeholder="YouTube Video- oder Playlist-URL …"></div><button id="analyzeBtn" class="primary">⌕ Analysieren</button></div>
+      <div id="message" class="message hidden"></div>
+      <section id="infoCard" class="info-grid hidden">
+        <div class="video-card card"><div class="video-top"><img id="thumbnail" class="thumbnail" alt="Thumbnail"><div class="meta"><h2 id="title">–</h2><p id="channel">–</p><p>◷ <span id="duration">–</span> · 👁 <span id="views">–</span></p></div></div><div class="quality-row"><div><small>▣ Verfügbare Video-Qualitäten</small><div id="videoQualities" class="chips"></div></div><div><small>♫ Verfügbare Audio-Qualitäten</small><div id="audioQualities" class="chips"></div></div></div></div>
+        <aside class="preview card"><h3>Vorschau</h3><img id="previewImage" alt="Vorschau"><dl><dt>Titel</dt><dd id="previewTitle">–</dd><dt>Kanal</dt><dd id="previewChannel">–</dd><dt>Dauer</dt><dd id="previewDuration">–</dd></dl></aside>
+      </section>
+      <section id="playlistPanel" class="playlist-panel card hidden">
+  <div class="playlist-head"><div><h3 id="playlistTitle">Playlist</h3><small id="playlistSelectionText">Alle Videos ausgewählt</small></div><span>Batch-Modus aktiv</span></div>
+  <div class="playlist-tools">
+    <label class="playlist-check-all"><input id="playlistSelectAll" type="checkbox" checked> Alle auswählen</label>
+    <button id="playlistInvert" class="secondary mini">Auswahl umkehren</button>
+    <button id="playlistOnlySelected" class="secondary mini">Nur Auswahl laden</button>
+  </div>
+  <div id="playlistEntries" class="playlist-entries"></div>
+</section>
+      <section class="controls card">
+<div class="preset-row"><span>Schnell-Presets</span>
+<button class="preset" data-preset="mp4-1080">MP4 · 1080p</button>
+<button class="preset" data-preset="mp4-best">MP4 · Beste Qualität</button>
+<button class="preset" data-preset="mp3-320">MP3 · 320 kbps</button>
+<button class="preset" data-preset="m4a-256">M4A · 256 kbps</button>
+</div>
+<div class="tabs"><button data-mode="video" class="tab active">▷ Video</button><button data-mode="audio" class="tab">♫ Audio</button></div><div class="control-grid"><label>Format<select id="container"></select></label><label><span id="qualityText">Qualität</span><select id="quality"></select></label><label id="codecLabel">Video Codec<select disabled><option>Automatisch</option></select></label><div class="toggles"><span>Zusätzliche Optionen</span><label><input id="thumb" type="checkbox"> Thumbnail einbetten</label><label><input id="metadata" type="checkbox" checked> Metadaten speichern</label></div></div><div class="name-row"><label>Dateiname<input id="filename" placeholder="Automatisch aus Videotitel"></label><label>Speicherort<input value="downloads/" disabled></label></div><div class="download-actions"><button id="downloadBtn" class="primary download" disabled>⇩ Download starten</button><button id="queueBtn" class="secondary download" disabled>☷ Zur Warteschlange</button></div></section>
+      <section id="suggestionsStrip" class="suggestion-section card"><div class="section-head"><div><h3>Vorschläge für dich</h3><p>Passend zum zuletzt analysierten Video oder Kanal.</p></div><button id="refreshSuggestions" class="secondary">↻ Neu laden</button></div><div id="suggestionGrid" class="suggestion-grid"><p class="muted">Analysiere ein Video, um Vorschläge zu laden.</p></div></section><section class="downloads card"><div class="section-head"><div><h3>Aktuelle Downloads</h3><p>Mehrere Jobs können parallel laufen.</p></div><span id="activeJobCount" class="queue-count">0 aktiv</span></div><div id="jobs"><p class="muted">Noch keine Downloads gestartet.</p></div></section>
+    </section>
 
-⚙ ☾ ◉
-🔗 
-⌕ Analysieren
-Thumbnail
-–
-
-–
-
-◷ – · 👁 –
-
-▣ Verfügbare Video-Qualitäten
-♫ Verfügbare Audio-Qualitäten
-Vorschau
-
-Vorschau
-Titel
-–
-Kanal
-–
-Dauer
-–
-Playlist
-
-Alle Videos ausgewählt
-Batch-Modus aktiv
- Alle auswählen  Auswahl umkehren  Nur Auswahl laden
-Schnell-Presets MP4 · 1080p MP4 · Beste Qualität MP3 · 320 kbps M4A · 256 kbps
-▷ Video♫ Audio
-FormatQualitätVideo Codec
-Zusätzliche Optionen Thumbnail einbettenMetadaten speichern
-DateinameSpeicherort
-⇩ Download starten☷ Zur Warteschlange
-Vorschläge für dich
-
-Passend zum zuletzt analysierten Video oder Kanal.
-
-↻ Neu laden
-Analysiere ein Video, um Vorschläge zu laden.
-
-Aktuelle Downloads
-
-Mehrere Jobs können parallel laufen.
-
-0 aktiv
-Noch keine Downloads gestartet.
-
-Downloads & Verlauf
-
-Persistiert in SQLite und nach einem Neustart weiterhin verfügbar.
-
-Gesamt0
-Fertig0
-Fehler0
-Playlists0
-
-Lade Verlauf …
-
-Einstellungen
-
-Die aktuellen Download-Optionen können als Standard gespeichert werden.
-
-Stelle Format, Qualität, Thumbnail und Metadaten im Downloader ein und speichere sie anschließend als Standard.
-
-Aktuelle Auswahl speichern
-Vorschläge
-
-Kontextbezogene Treffer zum zuletzt analysierten Video oder Kanal.
-
-Ein Klick übernimmt einen Treffer direkt in den Downloader.
-
-↻ Neu laden
-Noch keine Vorschläge geladen.
-
-Über
-
-YouTube Loader v0.5.0 · Safe Haven.
-
-Standalone-Entwicklungsstand mit Video/Audio, Playlist-Batch, SQLite-Historie, Abbruch, persistenten Einstellungen und kontextbezogenen Vorschlägen
+    <section data-view="history" class="hidden"><header><div><h1>Downloads & Verlauf</h1><p>Persistiert in SQLite und nach einem Neustart weiterhin verfügbar.</p></div></header><section class="history-stats"><div class="stat-card"><small>Gesamt</small><b id="statTotal">0</b></div><div class="stat-card"><small>Fertig</small><b id="statFinished">0</b></div><div class="stat-card"><small>Fehler</small><b id="statFailed">0</b></div><div class="stat-card"><small>Playlists</small><b id="statPlaylists">0</b></div></section><section class="card page-card"><div class="history-toolbar"><select id="historyStatus"><option value="all">Alle Status</option><option value="finished">Fertig</option><option value="failed">Fehler</option><option value="cancelled">Abgebrochen</option></select><select id="historyType"><option value="all">Video & Audio</option><option value="video">Video</option><option value="audio">Audio</option><option value="playlist">Playlists</option></select></div><div id="historyList"><p class="muted">Lade Verlauf …</p></div></section></section>
+    <section data-view="settings" class="hidden"><header><div><h1>Einstellungen</h1><p>Die aktuellen Download-Optionen können als Standard gespeichert werden.</p></div></header><section class="card page-card"><p class="muted">Stelle Format, Qualität, Thumbnail und Metadaten im Downloader ein und speichere sie anschließend als Standard.</p><button id="saveSettingsBtn" class="primary standalone">Aktuelle Auswahl speichern</button></section></section>
+    <section data-view="suggestions" class="hidden"><header><div><h1>Vorschläge</h1><p>Kontextbezogene Treffer zum zuletzt analysierten Video oder Kanal.</p></div></header><section class="card page-card"><div class="section-head"><p class="muted">Ein Klick übernimmt einen Treffer direkt in den Downloader.</p><button id="pageRefreshSuggestions" class="secondary">↻ Neu laden</button></div><div id="suggestionPageGrid" class="suggestion-grid"><p class="muted">Noch keine Vorschläge geladen.</p></div></section></section>
+    <section data-view="about" class="hidden"><header><div><h1>Über</h1><p>YouTube Loader v0.5.0 · Safe Haven.</p></div></header><section class="card page-card"><p>Standalone-Entwicklungsstand mit Video/Audio, Playlist-Batch, SQLite-Historie, Abbruch, persistenten Einstellungen und kontextbezogenen Vorschlägen.</p></section></section>
+  </main>
+</div><script src="/app.js"></script></body></html>
