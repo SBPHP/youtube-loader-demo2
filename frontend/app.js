@@ -289,13 +289,15 @@ function renderRuntime(data, tested=false){
   setRuntimeCheck('#rtDownloads', checks.downloads_writable);
   setRuntimeCheck('#rtDatabase', checks.database_writable);
   setRuntimeCheck('#rtYoutubeAuth', checks.youtube_auth);
+  setRuntimeCheck('#rtUserAgent', checks.browser_fingerprint);
 
   if($('#rtYtdlpVersion')) $('#rtYtdlpVersion').textContent=checks.yt_dlp?.version || '–';
   if($('#rtFfmpegVersion')) $('#rtFfmpegVersion').textContent=checks.ffmpeg?.version || '–';
   if($('#rtDownloadPath')) $('#rtDownloadPath').textContent=checks.downloads_writable?.path || '–';
   if($('#rtDatabasePath')) $('#rtDatabasePath').textContent=checks.database_writable?.path || '–';
   if($('#rtYoutubeAuthSource')) $('#rtYoutubeAuthSource').textContent=checks.youtube_auth?.ok ? `Secret aktiv · ${checks.youtube_auth?.source || 'configured'} · ${checks.youtube_auth?.normalized_rows || 0} Cookies normalisiert` : (checks.youtube_auth?.configured ? 'Cookie-Datei gefunden · Normalisierung fehlgeschlagen' : 'Kein Cookie-Secret gefunden');
-  if($('#rtVersion')) $('#rtVersion').textContent=`v${data?.version || '0.6.3'}`;
+  if($('#rtUserAgentPreview')) $('#rtUserAgentPreview').textContent=checks.browser_fingerprint?.ok ? (checks.browser_fingerprint?.preview || 'Mozilla/5.0 …') : (checks.browser_fingerprint?.configured ? 'User-Agent gesetzt · Format prüfen' : 'YOUTUBE_USER_AGENT fehlt');
+  if($('#rtVersion')) $('#rtVersion').textContent=`v${data?.version || '0.6.4'}`;
   if($('#rtFree')) $('#rtFree').textContent=data?.storage?.free_text || '–';
   if($('#rtJobs')) $('#rtJobs').textContent=String(data?.active_jobs ?? 0);
 
