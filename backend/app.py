@@ -5,6 +5,7 @@ import json
 import os
 import re
 import shutil
+import socket
 import sqlite3
 import subprocess
 import threading
@@ -144,6 +145,41 @@ def cookie_status() -> dict[str, Any]:
     }
 
 
+def tcp_port_open(host: str, port: int, timeout: float = 0.5) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+def po_token_provider_status() -> dict[str, Any]:
+    url = os.getenv("BGUTIL_PROVIDER_URL", "http://127.0.0.1:4416").strip()
+    host = "127.0.0.1"
+    port = 4416
+    match = re.match(r"^https?://([^/:]+)(?::(\d+))?", url)
+    if match:
+        host = match.group(1)
+        if match.group(2):
+            port = int(match.group(2))
+    return {
+        "ok": tcp_port_open(host, port),
+        "provider": "bgutil",
+        "version": "1.3.1",
+        "url": url,
+    }
+
+
+def js_runtime_status() -> dict[str, Any]:
+    node_version = command_version("node", ["--version"])
+    return {
+        "ok": bool(shutil.which("node")),
+        "runtime": "node",
+        "version": node_version,
+        "ejs_installed": True,
+    }
+
+
 def youtube_user_agent() -> str | None:
     value = os.getenv("YOUTUBE_USER_AGENT", "").strip()
     return value or None
@@ -170,10 +206,21 @@ def youtube_opts(options: dict[str, Any] | None = None) -> dict[str, Any]:
             **(opts.get("http_headers") or {}),
             "User-Agent": user_agent,
         }
+
+    provider_url = os.getenv("BGUTIL_PROVIDER_URL", "http://127.0.0.1:4416").strip()
+    extractor_args = dict(opts.get("extractor_args") or {})
+    youtube_args = dict(extractor_args.get("youtube") or {})
+    youtube_args["player_client"] = ["mweb"]
+    extractor_args["youtube"] = youtube_args
+    extractor_args["youtubepot-bgutilhttp"] = {"base_url": [provider_url]}
+    opts["extractor_args"] = extractor_args
+
+    # Node 22 is installed in the container and supported by yt-dlp EJS.
+    opts["js_runtimes"] = {"node": {}}
     return opts
 
 
-app = FastAPI(title="YouTube Loader", version="0.6.4")
+app = FastAPI(title="YouTube Loader", version="0.6.5")
 
 jobs: dict[str, dict[str, Any]] = {}
 jobs_lock = threading.Lock()
@@ -278,6 +325,8 @@ def runtime_snapshot() -> dict[str, Any]:
             },
             "youtube_auth": cookie_status(),
             "browser_fingerprint": user_agent_status(),
+            "po_token_provider": po_token_provider_status(),
+            "js_runtime": js_runtime_status(),
         },
         "storage": {
             "total": usage.total,
@@ -530,9 +579,15 @@ def youtube_info(payload: InfoRequest) -> dict[str, Any]:
                     status_code=401,
                     detail="YouTube verlangt für diese Server-IP eine angemeldete Session. Im Runtime-Center fehlt noch YouTube Auth. Hinterlege YOUTUBE_COOKIES_BASE64 als Render-Secret und versuche die Analyse erneut.",
                 ) from exc
+            provider = po_token_provider_status()
+            if not provider.get("ok"):
+                raise HTTPException(
+                    status_code=503,
+                    detail="YouTube Auth ist vorhanden, aber der PO-Token-Provider ist nicht erreichbar. Prüfe Runtime → PO Token Provider.",
+                ) from exc
             raise HTTPException(
                 status_code=401,
-                detail="YouTube hat die hinterlegte Session abgelehnt. Das Cookie-Secret muss wahrscheinlich erneuert werden.",
+                detail="YouTube lehnt den Request trotz Auth und PO-Token-Layer ab. Prüfe Runtime sowie Render-Logs; die Session/IP kann weiterhin von YouTube blockiert sein.",
             ) from exc
         raise HTTPException(status_code=400, detail=f"Analyse fehlgeschlagen: {exc}") from exc
 
