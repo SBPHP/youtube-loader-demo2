@@ -144,15 +144,36 @@ def cookie_status() -> dict[str, Any]:
     }
 
 
+def youtube_user_agent() -> str | None:
+    value = os.getenv("YOUTUBE_USER_AGENT", "").strip()
+    return value or None
+
+
+def user_agent_status() -> dict[str, Any]:
+    value = youtube_user_agent()
+    return {
+        "ok": bool(value and value.startswith("Mozilla/5.0")),
+        "configured": bool(value),
+        "preview": (value[:54] + "…") if value and len(value) > 55 else value,
+    }
+
+
 def youtube_opts(options: dict[str, Any] | None = None) -> dict[str, Any]:
     opts = dict(options or {})
     cookie_file = prepare_cookie_file()
     if cookie_file:
         opts["cookiefile"] = str(cookie_file)
+
+    user_agent = youtube_user_agent()
+    if user_agent:
+        opts["http_headers"] = {
+            **(opts.get("http_headers") or {}),
+            "User-Agent": user_agent,
+        }
     return opts
 
 
-app = FastAPI(title="YouTube Loader", version="0.6.3")
+app = FastAPI(title="YouTube Loader", version="0.6.4")
 
 jobs: dict[str, dict[str, Any]] = {}
 jobs_lock = threading.Lock()
@@ -256,6 +277,7 @@ def runtime_snapshot() -> dict[str, Any]:
                 "path": str(DATA_DIR),
             },
             "youtube_auth": cookie_status(),
+            "browser_fingerprint": user_agent_status(),
         },
         "storage": {
             "total": usage.total,
