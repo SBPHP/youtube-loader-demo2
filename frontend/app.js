@@ -299,9 +299,9 @@ function renderRuntime(data, tested=false){
   if($('#rtDatabasePath')) $('#rtDatabasePath').textContent=checks.database_writable?.path || '–';
   if($('#rtYoutubeAuthSource')) $('#rtYoutubeAuthSource').textContent=checks.youtube_auth?.ok ? `Secret aktiv · ${checks.youtube_auth?.source || 'configured'} · ${checks.youtube_auth?.normalized_rows || 0} Cookies normalisiert` : (checks.youtube_auth?.configured ? 'Cookie-Datei gefunden · Normalisierung fehlgeschlagen' : 'Kein Cookie-Secret gefunden');
   if($('#rtUserAgentPreview')) $('#rtUserAgentPreview').textContent=checks.browser_fingerprint?.ok ? (checks.browser_fingerprint?.preview || 'Mozilla/5.0 …') : (checks.browser_fingerprint?.configured ? 'User-Agent gesetzt · Format prüfen' : 'YOUTUBE_USER_AGENT fehlt');
-  if($('#rtPoProviderInfo')) $('#rtPoProviderInfo').textContent=checks.po_token_provider?.ok ? `bgutil ${checks.po_token_provider?.version || ''} · erreichbar` : 'Provider nicht erreichbar';
+  if($('#rtPoProviderInfo')) $('#rtPoProviderInfo').textContent=checks.po_token_provider?.ok ? `bgutil ${checks.po_token_provider?.version || ''} · /ping OK` : (checks.po_token_provider?.tcp_ok ? 'Port offen · /ping fehlgeschlagen' : 'Provider-Prozess nicht erreichbar');
   if($('#rtJsRuntimeInfo')) $('#rtJsRuntimeInfo').textContent=checks.js_runtime?.ok ? `${checks.js_runtime?.runtime || 'node'} ${checks.js_runtime?.version || ''} · EJS bereit` : 'JS Runtime fehlt';
-  if($('#rtVersion')) $('#rtVersion').textContent=`v${data?.version || '0.6.5'}`;
+  if($('#rtVersion')) $('#rtVersion').textContent=`v${data?.version || '0.6.6'}`;
   if($('#rtFree')) $('#rtFree').textContent=data?.storage?.free_text || '–';
   if($('#rtJobs')) $('#rtJobs').textContent=String(data?.active_jobs ?? 0);
 
