@@ -294,8 +294,8 @@ function renderRuntime(data, tested=false){
   if($('#rtFfmpegVersion')) $('#rtFfmpegVersion').textContent=checks.ffmpeg?.version || '–';
   if($('#rtDownloadPath')) $('#rtDownloadPath').textContent=checks.downloads_writable?.path || '–';
   if($('#rtDatabasePath')) $('#rtDatabasePath').textContent=checks.database_writable?.path || '–';
-  if($('#rtYoutubeAuthSource')) $('#rtYoutubeAuthSource').textContent=checks.youtube_auth?.ok ? `Secret aktiv · ${checks.youtube_auth?.source || 'configured'}` : 'Kein Cookie-Secret gesetzt';
-  if($('#rtVersion')) $('#rtVersion').textContent=`v${data?.version || '0.6.1'}`;
+  if($('#rtYoutubeAuthSource')) $('#rtYoutubeAuthSource').textContent=checks.youtube_auth?.ok ? `Secret aktiv · ${checks.youtube_auth?.source || 'configured'}` : (checks.youtube_auth?.configured ? 'Cookie-Datei gefunden · Format prüfen' : 'Kein Cookie-Secret gefunden');
+  if($('#rtVersion')) $('#rtVersion').textContent=`v${data?.version || '0.6.2'}`;
   if($('#rtFree')) $('#rtFree').textContent=data?.storage?.free_text || '–';
   if($('#rtJobs')) $('#rtJobs').textContent=String(data?.active_jobs ?? 0);
 
