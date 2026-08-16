@@ -10,6 +10,7 @@ import sqlite3
 import subprocess
 import threading
 import uuid
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -154,7 +155,7 @@ def tcp_port_open(host: str, port: int, timeout: float = 0.5) -> bool:
 
 
 def po_token_provider_status() -> dict[str, Any]:
-    url = os.getenv("BGUTIL_PROVIDER_URL", "http://127.0.0.1:4416").strip()
+    url = os.getenv("BGUTIL_PROVIDER_URL", "http://127.0.0.1:4416").strip().rstrip("/")
     host = "127.0.0.1"
     port = 4416
     match = re.match(r"^https?://([^/:]+)(?::(\d+))?", url)
@@ -162,8 +163,22 @@ def po_token_provider_status() -> dict[str, Any]:
         host = match.group(1)
         if match.group(2):
             port = int(match.group(2))
+
+    tcp_ok = tcp_port_open(host, port)
+    ping_ok = False
+    ping_error = None
+    if tcp_ok:
+        try:
+            with urllib.request.urlopen(f"{url}/ping", timeout=2) as response:
+                ping_ok = 200 <= int(response.status) < 300
+        except Exception as exc:
+            ping_error = str(exc)[:180]
+
     return {
-        "ok": tcp_port_open(host, port),
+        "ok": bool(tcp_ok and ping_ok),
+        "tcp_ok": tcp_ok,
+        "ping_ok": ping_ok,
+        "ping_error": ping_error,
         "provider": "bgutil",
         "version": "1.3.1",
         "url": url,
@@ -220,7 +235,7 @@ def youtube_opts(options: dict[str, Any] | None = None) -> dict[str, Any]:
     return opts
 
 
-app = FastAPI(title="YouTube Loader", version="0.6.5")
+app = FastAPI(title="YouTube Loader", version="0.6.6")
 
 jobs: dict[str, dict[str, Any]] = {}
 jobs_lock = threading.Lock()
