@@ -30,37 +30,82 @@ DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
 COOKIE_FILE = DATA_DIR / "youtube-cookies.txt"
 
 
+def normalize_netscape_cookie_file(source: Path) -> Path | None:
+    """Create a yt-dlp compatible working copy without modifying the Render secret."""
+    try:
+        text = source.read_text(encoding="utf-8", errors="ignore")
+    except Exception:
+        return None
+
+    raw_lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    output: list[str] = []
+
+    if not raw_lines or not raw_lines[0].strip().startswith(("# Netscape HTTP Cookie File", "# HTTP Cookie File")):
+        output.append("# Netscape HTTP Cookie File")
+
+    for line in raw_lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.startswith("#"):
+            output.append(line)
+            continue
+
+        parts = line.split("\t")
+        if len(parts) != 7:
+            continue
+
+        domain, include_subdomains, path, secure, expires, name, value = parts
+
+        if include_subdomains.upper() == "TRUE" and domain in {"youtube.com", "www.youtube.com", "m.youtube.com"}:
+            domain = ".youtube.com"
+
+        include_subdomains = "TRUE" if include_subdomains.upper() == "TRUE" else "FALSE"
+        secure = "TRUE" if secure.upper() == "TRUE" else "FALSE"
+
+        output.append("\t".join([domain, include_subdomains, path or "/", secure, expires or "0", name, value]))
+
+    if len([line for line in output if line and not line.startswith("#")]) == 0:
+        return None
+
+    normalized = DATA_DIR / "youtube-cookies-normalized.txt"
+    normalized.write_text("\n".join(output) + "\n", encoding="utf-8")
+    os.chmod(normalized, 0o600)
+    return normalized
+
+
 def prepare_cookie_file() -> Path | None:
-    """Resolve YouTube cookies from Render Secret File or optional environment secrets."""
+    """Resolve cookies and return a normalized yt-dlp compatible working copy."""
     encoded = os.getenv("YOUTUBE_COOKIES_BASE64", "").strip()
     plain = os.getenv("YOUTUBE_COOKIES_TEXT", "")
     external_path = os.getenv("YOUTUBE_COOKIES_FILE", "").strip()
 
-    auto_secret_paths = [
+    candidates: list[Path] = [
         Path("/etc/secrets/youtube-cookies.txt"),
         Path("/etc/secrets/cookies.txt"),
     ]
 
     try:
-        for path in auto_secret_paths:
+        for path in candidates:
             if path.is_file() and path.stat().st_size > 0:
-                return path
+                return normalize_netscape_cookie_file(path)
 
         if encoded:
-            content = base64.b64decode(encoded, validate=True)
-            COOKIE_FILE.write_bytes(content)
-            os.chmod(COOKIE_FILE, 0o600)
-            return COOKIE_FILE
+            raw = DATA_DIR / "youtube-cookies-from-base64.txt"
+            raw.write_bytes(base64.b64decode(encoded, validate=True))
+            os.chmod(raw, 0o600)
+            return normalize_netscape_cookie_file(raw)
 
         if plain.strip():
-            COOKIE_FILE.write_text(plain, encoding="utf-8")
-            os.chmod(COOKIE_FILE, 0o600)
-            return COOKIE_FILE
+            raw = DATA_DIR / "youtube-cookies-from-text.txt"
+            raw.write_text(plain, encoding="utf-8")
+            os.chmod(raw, 0o600)
+            return normalize_netscape_cookie_file(raw)
 
         if external_path:
             path = Path(external_path).expanduser().resolve()
             if path.is_file() and path.stat().st_size > 0:
-                return path
+                return normalize_netscape_cookie_file(path)
     except Exception:
         return None
 
@@ -70,33 +115,32 @@ def prepare_cookie_file() -> Path | None:
 def cookie_status() -> dict[str, Any]:
     path = prepare_cookie_file()
     source = "none"
-    if path:
-        if str(path).startswith("/etc/secrets/"):
-            source = "render-secret-file"
-        elif os.getenv("YOUTUBE_COOKIES_BASE64", "").strip():
-            source = "base64-secret"
-        elif os.getenv("YOUTUBE_COOKIES_TEXT", "").strip():
-            source = "text-secret"
-        else:
-            source = "file"
 
-    valid_header = False
+    if Path("/etc/secrets/youtube-cookies.txt").is_file() or Path("/etc/secrets/cookies.txt").is_file():
+        source = "render-secret-file"
+    elif os.getenv("YOUTUBE_COOKIES_BASE64", "").strip():
+        source = "base64-secret"
+    elif os.getenv("YOUTUBE_COOKIES_TEXT", "").strip():
+        source = "text-secret"
+    elif os.getenv("YOUTUBE_COOKIES_FILE", "").strip():
+        source = "file"
+
+    rows = 0
     if path and path.is_file():
         try:
-            first = path.read_text(encoding="utf-8", errors="ignore").splitlines()[:3]
-            valid_header = any(
-                line.strip().startswith("# Netscape HTTP Cookie File")
-                or line.strip().startswith("# HTTP Cookie File")
-                for line in first
-            )
+            rows = len([
+                line for line in path.read_text(encoding="utf-8", errors="ignore").splitlines()
+                if line and not line.startswith("#")
+            ])
         except Exception:
-            valid_header = False
+            rows = 0
 
     return {
-        "ok": bool(path and path.is_file() and path.stat().st_size > 0 and valid_header),
-        "configured": bool(path),
+        "ok": bool(path and path.is_file() and path.stat().st_size > 0 and rows > 0),
+        "configured": source != "none",
         "source": source,
-        "format_ok": valid_header,
+        "format_ok": bool(path and rows > 0),
+        "normalized_rows": rows,
     }
 
 
@@ -108,7 +152,7 @@ def youtube_opts(options: dict[str, Any] | None = None) -> dict[str, Any]:
     return opts
 
 
-app = FastAPI(title="YouTube Loader", version="0.6.2")
+app = FastAPI(title="YouTube Loader", version="0.6.3")
 
 jobs: dict[str, dict[str, Any]] = {}
 jobs_lock = threading.Lock()
